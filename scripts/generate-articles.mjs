@@ -6,11 +6,11 @@ import { filterArticles, batchRewrite } from './ai-review.mjs';
 import {
   FILTER_SYSTEM_PROMPT,
   buildFilterPrompt,
-  parseFilterResponse,
   REWRITE_SYSTEM_PROMPT,
   buildRewritePrompt
 } from './content-filter.mjs';
 import {
+  CATEGORIES,
   getTargetCount,
   calcReadTime,
   generateId,
@@ -24,6 +24,63 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '..');
 const DATA_DIR = path.join(ROOT, 'data', 'articles');
+
+const PRESET_ARTICLES = [
+  {
+    category: '航天深空·天文新知',
+    title: '国际空间站上的植物实验：太空种菜不是梦',
+    content: '<p>在国际空间站的\"蔬菜生产系统\"中，宇航员已经成功种植了生菜、萝卜和辣椒。这些太空蔬菜不仅为宇航员提供了新鲜食物来源，还帮助科学家了解微重力环境对植物生长的影响。</p><p>太空种植面临诸多挑战：没有重力，植物不知道\"上下\"；缺乏自然光照，需要LED灯补光；水分不会自然下沉，容易在根部积水导致腐烂。科学家通过旋转装置模拟重力、精确控制光照周期和营养液循环，逐步解决了这些难题。</p><p>未来的月球基地和火星探险中，太空农业将成为生存的关键技术。目前NASA正在研究如何在封闭环境中实现食物的可持续生产。</p>',
+    source: 'NASA科普'
+  },
+  {
+    category: '考古文博·古文明发掘',
+    title: '秦始皇陵的水银之谜：地质检测证实史书记载',
+    content: '<p>《史记》记载秦始皇陵中\"以水银为百川江河大海\"。现代地质学家通过土壤汞含量检测，发现陵墓封土区域的汞含量确实异常偏高，是周围区域的数倍。</p><p>这些汞蒸气从何而来？科学家推测，秦代工匠可能将大量液态汞注入陵墓内部，模拟江河湖海的流动。汞在常温下呈液态且不易挥发，能在密闭空间中长期保存。</p><p>这一发现不仅验证了司马迁的记载，也说明秦代工匠对汞的物理性质已有深入了解。不过出于文物保护考虑，目前尚未开挖主墓室。</p>',
+    source: '国家文物局'
+  },
+  {
+    category: '大国工程·前沿科技突破',
+    title: '中国高铁为什么能跑350公里时速还这么稳？',
+    content: '<p>乘坐中国高铁时，即使以350公里时速行驶，硬币也能立在窗台上不倒。这背后是一系列精密工程的支撑。</p><p>首先是无砟轨道技术。传统铁路用碎石铺轨，容易变形；高铁采用整体浇筑的混凝土轨道板，平整度误差控制在0.3毫米以内。其次是列车的悬挂系统，采用空气弹簧和主动减振技术，能实时感知并抵消振动。</p><p>另一个关键是中国自主研发的\"北斗+5G\"列控系统，每秒对列车位置和速度进行精确计算，确保相邻列车之间保持安全距离。这些技术的综合运用，让中国高铁成为世界上运营时速最高的铁路网络。</p>',
+    source: '中国铁路'
+  },
+  {
+    category: '地球自然·气象地质博物探索',
+    title: '地球最深的地方：马里亚纳海沟到底有多深？',
+    content: '<p>马里亚纳海沟位于太平洋西部，最深处叫\"挑战者深渊\"，深度约10994米。如果把珠穆朗玛峰放进去，峰顶距海面还有2000多米。</p><p>海沟底部的压力是海面的1100倍，相当于一个指甲盖大小的面积承受1吨重的压力。温度只有1-4℃，常年漆黑一片。但即便如此极端的环境，科学家仍发现了多种微生物和深海生物。</p><p>2020年，中国\"奋斗者号\"载人潜水器成功坐底马里亚纳海沟，创造了10909米的中国载人深潜纪录。潜水器的钛合金球壳能承受巨大水压，保障了三位科学家的安全。</p>',
+    source: '中国科学院'
+  },
+  {
+    category: '生物世界·生命科学科普',
+    title: '为什么猫总是能四脚着地？',
+    content: '<p>猫从高处落下时总能四脚着地，这个能力叫做\"翻正反射\"。猫的脊柱非常柔软，有30块椎骨（人类只有24块），能在空中快速扭转身体。</p><p>当猫开始下落时，内耳中的前庭系统感知到身体方向变化，大脑立刻发出指令：先转动前半身朝下，再扭转后半身跟上，整个过程只需0.3秒。</p><p>不过\"猫有九条命\"是夸张说法。猫从不同高度摔落的存活率并不相同：低处（2-6层）反而比高处更危险，因为猫来不及完成翻转。高处坠落时猫会张开四肢增加空气阻力，起到\"降落伞\"效果，降低着地速度。</p>',
+    source: '动物科学'
+  },
+  {
+    category: '地理探索·环球人文地貌',
+    title: '撒哈拉沙漠曾经是绿色的：万年前的非洲大草原',
+    content: '<p>今天的撒哈拉沙漠是世界上最大的热带沙漠，面积约等于整个中国国土面积。但大约6000年前，这里曾是一片水草丰美的大草原，有湖泊、河流和成群的野生动物。</p><p>科学家通过卫星遥感发现沙漠下方的古河床遗迹，以及大量鳄鱼和河马的化石。这些证据表明，地球轨道的微小变化导致季风北移，给撒哈拉带来了充沛降雨。</p><p>后来地球轨道再次变化，季风南退，草原逐渐沙化。这个过程持续了数千年。撒哈拉的变迁提醒我们：地球的气候从来不是一成不变的。</p>',
+    source: '中国国家地理'
+  },
+  {
+    category: '青少年健康医学科普',
+    title: '为什么青少年需要睡够9小时？',
+    content: '<p>美国国家睡眠基金会建议11-13岁的青少年每天睡9-11小时。但现实中很多同学只睡7-8小时，上课打瞌睡成了常态。</p><p>睡眠不足不只是困倦那么简单。在深度睡眠阶段，大脑会分泌生长激素，这对青少年的身高发育至关重要。同时，睡眠也是大脑整理记忆的过程——白天学到的知识在睡眠中被\"巩固\"，从短期记忆转为长期记忆。</p><p>长期睡眠不足还会影响情绪调节能力，容易焦虑、烦躁。建议固定作息时间，睡前一小时远离电子屏幕，保持卧室安静黑暗。</p>',
+    source: '健康科普'
+  },
+  {
+    category: '生态环境·地球保护科考',
+    title: '大熊猫从\"濒危\"降为\"易危\"：保护行动的胜利',
+    content: '<p>2021年，中国宣布大熊猫野外种群数量增至1864只，受威胁等级从\"濒危\"降为\"易危\"。这是几十年持续保护的成果。</p><p>大熊猫保护的核心策略是建立自然保护区。目前中国已建立67个大熊猫保护区，覆盖了54%的野生栖息地。同时，人工繁殖技术也取得突破，圈养数量超过600只。</p><p>但\"易危\"并不意味着安全。栖息地碎片化仍然是最大威胁——公路和村庄把完整的森林切割成小块，阻碍了大熊猫的基因交流。科学家正在建设\"大熊猫国家公园\"，用生态廊道连接孤立的栖息地。</p>',
+    source: 'WWF中国'
+  },
+  {
+    category: '环球人文与跨国科考见闻',
+    title: '南极科考站的生活：科学家如何在极地过冬？',
+    content: '<p>南极冬季气温可降至零下60℃，连续数月不见阳光。在这样的极端环境中，中国南极科考队员需要驻守半年以上。</p><p>科考站的建筑采用架空设计，避免积雪掩埋；墙体有厚厚的保温层，室内保持20℃左右。食物以冷冻和罐头为主，近年通过温室种植部分蔬菜改善了饮食。</p><p>最考验人的是心理状态。极夜期间，外面一片漆黑，暴风雪持续数周，队员只能在站内活动。科考站会安排丰富的文娱活动，并定期与家人视频通话，帮助队员保持心理健康。</p>',
+    source: '中国极地研究中心'
+  }
+];
 
 function getDateArg() {
   const arg = process.argv.find(a => a.startsWith('--date='));
@@ -40,8 +97,7 @@ function getGeneratedBy() {
 async function loadExistingArticles(dateStr) {
   const filePath = path.join(DATA_DIR, `${dateStr}.json`);
   try {
-    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    return data;
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
   } catch {
     return null;
   }
@@ -49,11 +105,9 @@ async function loadExistingArticles(dateStr) {
 
 async function loadHistoricalArticles(dateStr, count) {
   const archive = [];
-  const dir = DATA_DIR;
+  if (!fs.existsSync(DATA_DIR)) return [];
 
-  if (!fs.existsSync(dir)) return [];
-
-  const files = fs.readdirSync(dir)
+  const files = fs.readdirSync(DATA_DIR)
     .filter(f => f.endsWith('.json') && f !== `${dateStr}.json`)
     .sort()
     .reverse()
@@ -61,7 +115,7 @@ async function loadHistoricalArticles(dateStr, count) {
 
   for (const file of files) {
     try {
-      const data = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8'));
+      const data = JSON.parse(fs.readFileSync(path.join(DATA_DIR, file), 'utf-8'));
       if (data.articles) {
         archive.push(...data.articles.filter(a => !a.isWechat));
       }
@@ -80,26 +134,43 @@ async function saveArticles(dateStr, data) {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
-
   const filePath = path.join(DATA_DIR, `${dateStr}.json`);
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
   console.log(`Saved to ${filePath}`);
 }
 
 function buildArticle(raw, dateStr, index) {
-  const { wordCount, readTime } = calcReadTime(raw.rewrittenContent || raw.content || '');
+  const content = raw.rewrittenContent || raw.content || `<p>${raw.summary || ''}</p>`;
+  const { wordCount, readTime } = calcReadTime(content);
 
   return {
     id: generateId(dateStr, index),
     category: raw.category || '推荐阅读',
     title: raw.title || '无标题',
-    content: raw.rewrittenContent || `<p>${raw.summary || raw.content || ''}</p>`,
+    content,
     wordCount,
     readTime,
     source: raw.source || '',
     sourceUrl: raw.link || raw.sourceUrl || '',
     coverImage: raw.coverImage || '',
     isWechat: raw.isWechat || false
+  };
+}
+
+function buildPresetArticle(preset, dateStr, index) {
+  const { wordCount, readTime } = calcReadTime(preset.content);
+  return {
+    id: generateId(dateStr, index),
+    category: preset.category,
+    title: preset.title,
+    content: preset.content,
+    wordCount,
+    readTime,
+    source: preset.source || '',
+    sourceUrl: '',
+    coverImage: '',
+    isWechat: false,
+    sourceNote: '预置科普'
   };
 }
 
@@ -127,77 +198,105 @@ async function main() {
   }
   console.log(`Total raw items: ${allRawItems.length}`);
 
+  let finalArticles = [];
+
   if (allRawItems.length === 0) {
-    console.log('\nNo news fetched. Using historical archive...');
+    console.log('\n⚠ No news fetched from any source.');
+
+    console.log('Trying historical archive...');
     const archived = await loadHistoricalArticles(dateStr, targetCount);
-    if (archived.length > 0) {
-      const output = {
-        date: dateStr,
-        isWeekend,
-        generatedAt: new Date().toISOString(),
-        generatedBy: `${generatedBy}-archive`,
-        articles: [...archived, ...existingWechat],
-        totalArticles: archived.length + existingWechat.length
-      };
-      await saveArticles(dateStr, output);
-      console.log(`\nDone! ${archived.length} archived articles saved.`);
-      return;
+
+    if (archived.length >= targetCount) {
+      console.log(`Using ${archived.length} archived articles.`);
+      archived.forEach((item, i) => {
+        finalArticles.push(buildArticle(item, dateStr, finalArticles.length));
+      });
+    } else {
+      console.log(`Archive has ${archived.length} articles. Using preset fallback to fill ${targetCount} slots.`);
+      archived.forEach((item, i) => {
+        finalArticles.push(buildArticle(item, dateStr, finalArticles.length));
+      });
+
+      const shortfall = targetCount - finalArticles.length;
+      const shuffledPresets = [...PRESET_ARTICLES].sort(() => Math.random() - 0.5);
+      for (let i = 0; i < shortfall && i < shuffledPresets.length; i++) {
+        finalArticles.push(buildPresetArticle(shuffledPresets[i], dateStr, finalArticles.length));
+      }
     }
-    console.error('No articles available. Exiting.');
-    process.exit(1);
-  }
-
-  console.log('\n[2/4] Filtering content with MIMO...');
-  const filtered = await filterArticles(allRawItems, FILTER_SYSTEM_PROMPT, buildFilterPrompt);
-  console.log(`Passed filter: ${filtered.length}/${allRawItems.length}`);
-
-  const categories = distributeCategories(targetCount);
-  const selected = [];
-
-  for (const cat of categories) {
-    const candidates = filtered.filter(item =>
-      item.category === cat && !selected.find(s => s.title === item.title)
-    );
-    if (candidates.length > 0) {
-      selected.push(candidates[0]);
+  } else {
+    console.log('\n[2/4] Filtering content with MIMO...');
+    let filtered;
+    try {
+      filtered = await filterArticles(allRawItems, FILTER_SYSTEM_PROMPT, buildFilterPrompt);
+    } catch (err) {
+      console.warn('AI filter failed, using all items:', err.message);
+      filtered = allRawItems;
     }
+    console.log(`Passed filter: ${filtered.length}/${allRawItems.length}`);
+
+    const categories = distributeCategories(targetCount);
+    const selected = [];
+
+    for (const cat of categories) {
+      const candidates = filtered.filter(item =>
+        item.category === cat && !selected.find(s => s.title === item.title)
+      );
+      if (candidates.length > 0) {
+        selected.push(candidates[0]);
+      }
+    }
+
+    if (selected.length < targetCount) {
+      const remaining = filtered.filter(item =>
+        !selected.find(s => s.title === item.title)
+      );
+      selected.push(...remaining.slice(0, targetCount - selected.length));
+    }
+
+    if (selected.length < targetCount) {
+      const shortfall = targetCount - selected.length;
+      console.log(`Need ${shortfall} more, trying archive...`);
+      const archived = await loadHistoricalArticles(dateStr, shortfall);
+      selected.push(...archived);
+    }
+
+    if (selected.length < targetCount) {
+      const shortfall = targetCount - selected.length;
+      const shuffledPresets = [...PRESET_ARTICLES].sort(() => Math.random() - 0.5);
+      for (let i = 0; i < shortfall && i < shuffledPresets.length; i++) {
+        selected.push({ ...shuffledPresets[i], sourceNote: 'preset' });
+      }
+    }
+
+    const toRewrite = selected.filter(a => !a.sourceNote);
+    const alreadyDone = selected.filter(a => a.sourceNote);
+
+    console.log(`\n[3/4] Rewriting ${toRewrite.length} articles with MIMO...`);
+    let rewritten = [];
+    try {
+      rewritten = await batchRewrite(toRewrite, REWRITE_SYSTEM_PROMPT, buildRewritePrompt);
+    } catch (err) {
+      console.warn('AI rewrite failed, using originals:', err.message);
+      rewritten = toRewrite;
+    }
+    console.log(`Successfully rewritten: ${rewritten.length}`);
+
+    console.log('\n[4/4] Building final output...');
+    rewritten.forEach((item) => {
+      finalArticles.push(buildArticle(item, dateStr, finalArticles.length));
+    });
+
+    alreadyDone.forEach(item => {
+      if (item.sourceNote === 'preset') {
+        finalArticles.push(buildPresetArticle(item, dateStr, finalArticles.length));
+      } else {
+        finalArticles.push(buildArticle(item, dateStr, finalArticles.length));
+      }
+    });
   }
-
-  if (selected.length < targetCount) {
-    const remaining = filtered.filter(item =>
-      !selected.find(s => s.title === item.title)
-    );
-    const shortfall = targetCount - selected.length;
-    selected.push(...remaining.slice(0, shortfall));
-  }
-
-  if (selected.length < targetCount) {
-    const shortfall = targetCount - selected.length;
-    console.log(`Only ${selected.length} articles, fetching ${shortfall} from archive...`);
-    const archived = await loadHistoricalArticles(dateStr, shortfall);
-    selected.push(...archived);
-  }
-
-  const toRewrite = selected.filter(a => !a.sourceNote);
-  const alreadyProcessed = selected.filter(a => a.sourceNote);
-
-  console.log(`\n[3/4] Rewriting ${toRewrite.length} articles with MIMO...`);
-  const rewritten = await batchRewrite(toRewrite, REWRITE_SYSTEM_PROMPT, buildRewritePrompt);
-  console.log(`Successfully rewritten: ${rewritten.length}`);
-
-  console.log('\n[4/4] Building final output...');
-  const finalArticles = [];
-
-  rewritten.forEach((item, i) => {
-    finalArticles.push(buildArticle(item, dateStr, finalArticles.length));
-  });
-
-  alreadyProcessed.forEach(item => {
-    finalArticles.push(buildArticle(item, dateStr, finalArticles.length));
-  });
 
   const categoryCounts = {};
-  for (const cat of ArticleList.CATEGORIES || []) {
+  for (const cat of CATEGORIES) {
     categoryCounts[cat] = 0;
   }
   finalArticles.forEach(a => {
@@ -215,20 +314,12 @@ async function main() {
   };
 
   await saveArticles(dateStr, output);
-  console.log(`\nDone! ${finalArticles.length} articles generated for ${dateStr}.`);
+  console.log(`\n✓ Done! ${finalArticles.length} articles generated for ${dateStr}.`);
+  console.log(`  Category distribution:`);
+  for (const [cat, count] of Object.entries(categoryCounts)) {
+    if (count > 0) console.log(`    ${cat}: ${count}`);
+  }
 }
-
-const ArticleList = { CATEGORIES: [
-  '航天深空·天文新知',
-  '考古文博·古文明发掘',
-  '大国工程·前沿科技突破',
-  '地球自然·气象地质博物探索',
-  '生物世界·生命科学科普',
-  '地理探索·环球人文地貌',
-  '青少年健康医学科普',
-  '生态环境·地球保护科考',
-  '环球人文与跨国科考见闻'
-]};
 
 main().catch(err => {
   console.error('Fatal error:', err);

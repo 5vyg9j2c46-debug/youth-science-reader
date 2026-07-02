@@ -59,14 +59,20 @@ const GitHubAPI = (() => {
       try {
         const run = await _request(`/repos/${repo}/actions/runs/${runId}`);
         if (onStatus) onStatus(run.status, run.conclusion);
-        if (run.status === 'completed') return run;
+        if (run.status === 'completed') {
+          if (run.conclusion === 'failure') {
+            throw new Error('云端工作流执行失败，请检查Actions日志');
+          }
+          return run;
+        }
       } catch (err) {
+        if (err.message.includes('失败')) throw err;
         console.warn('Poll error:', err.message);
       }
       await new Promise(r => setTimeout(r, 5000));
       attempts++;
     }
-    throw new Error('Workflow run timed out');
+    throw new Error('等待超时，请稍后刷新页面查看');
   }
 
   async function getRawFile(path) {

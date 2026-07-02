@@ -115,11 +115,6 @@ const App = (() => {
     }
 
     Calendar.refresh();
-
-    // Auto-generate if today has no articles
-    if (dateStr === _getTodayStr() && articles.length === 0) {
-      _autoGenerate();
-    }
   }
 
   async function _autoGenerate() {
@@ -165,15 +160,18 @@ const App = (() => {
       const run = await GitHubAPI.getLatestRun('manual-generate.yml');
       if (run) {
         let pct = 10;
-        await GitHubAPI.pollRunStatus(run.id, (s) => {
+        const completedRun = await GitHubAPI.pollRunStatus(run.id, (s, conclusion) => {
           if (s === 'in_progress') {
-            pct = Math.min(pct + 15, 85);
-            _setProgress(pct, 'AI正在生成文稿...', progressBar, progressPct, statusText);
+            pct = Math.min(pct + 12, 85);
+            _setProgress(pct, 'AI正在生成文稿（约12-40秒）...', progressBar, progressPct, statusText);
+          } else if (s === 'completed' && conclusion === 'failure') {
+            _setProgress(0, '云端生成失败，请稍后重试', progressBar, progressPct, statusText);
           }
         });
+        if (!completedRun) return;
       } else {
-        _setProgress(50, '云端处理中，请耐心等待...', progressBar, progressPct, statusText);
-        await new Promise(r => setTimeout(r, 20000));
+        _setProgress(30, '云端处理中，请耐心等待...', progressBar, progressPct, statusText);
+        await new Promise(r => setTimeout(r, 25000));
       }
 
       _setProgress(90, '生成完成，正在加载...', progressBar, progressPct, statusText);
@@ -185,11 +183,11 @@ const App = (() => {
         progressContainer.classList.add('hidden');
       }, 2000);
     } catch (err) {
-      _setProgress(0, '生成失败: ' + err.message, progressBar, progressPct, statusText);
+      _setProgress(0, '⚠ ' + err.message, progressBar, progressPct, statusText);
       setTimeout(() => {
         status.classList.add('hidden');
         progressContainer.classList.add('hidden');
-      }, 5000);
+      }, 8000);
     } finally {
       btn.disabled = false;
     }
