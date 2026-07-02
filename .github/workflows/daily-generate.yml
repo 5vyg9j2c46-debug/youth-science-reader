@@ -1,0 +1,50 @@
+name: Daily Article Generation
+
+on:
+  schedule:
+    - cron: '0 16 * * *'
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Target date (YYYY-MM-DD), defaults to today'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          npm init -y
+          npm install rss-parser cheerio
+
+      - name: Generate articles
+        run: node scripts/generate-articles.mjs ${{ inputs.date && format('--date={0}', inputs.date) || '' }} --source=auto
+        env:
+          MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}
+          MIMO_BASE_URL: ${{ secrets.MIMO_BASE_URL }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/articles/
+          git diff --staged --quiet || git commit -m "auto: generate articles $(date +%Y-%m-%d)"
+          git push

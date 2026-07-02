@@ -1,0 +1,14 @@
+{
+  "name": "youth-science-reader",
+  "version": "1.0.0",
+  "description": "青少年全科视野科普阅读网页",
+  "type": "module",
+  "scripts": {
+    "generate": "node scripts/generate-articles.mjs",
+    "collect-wechat": "node scripts/collect-wechat.mjs"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "rss-parser": "^3.13.0"
+  }
+}
