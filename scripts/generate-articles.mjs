@@ -6,8 +6,10 @@ import { filterArticles, batchRewrite } from './ai-review.mjs';
 import {
   FILTER_SYSTEM_PROMPT,
   buildFilterPrompt,
-  REWRITE_SYSTEM_PROMPT,
-  buildRewritePrompt
+  KEEP_VERBATIM_PROMPT,
+  COMPRESS_PROMPT,
+  buildKeepPrompt,
+  buildCompressPrompt
 } from './content-filter.mjs';
 import {
   CATEGORIES,
@@ -139,8 +141,38 @@ async function saveArticles(dateStr, data) {
   console.log(`Saved to ${filePath}`);
 }
 
+const CATEGORY_COVER = {
+  '航天深空·天文新知': 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=600&h=300&fit=crop',
+  '考古文博·古文明发掘': 'https://images.unsplash.com/photo-1599940824399-b87987ceb72a?w=600&h=300&fit=crop',
+  '大国工程·前沿科技突破': 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=600&h=300&fit=crop',
+  '地球自然·气象地质博物探索': 'https://images.unsplash.com/photo-1440342359743-84fcb8c21f21?w=600&h=300&fit=crop',
+  '生物世界·生命科学科普': 'https://images.unsplash.com/photo-1474511320723-9a56873571b7?w=600&h=300&fit=crop',
+  '地理探索·环球人文地貌': 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=600&h=300&fit=crop',
+  '青少年健康医学科普': 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=600&h=300&fit=crop',
+  '生态环境·地球保护科考': 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=600&h=300&fit=crop',
+  '环球人文与跨国科考见闻': 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=600&h=300&fit=crop'
+};
+
+function injectCoverImage(content, images, category) {
+  if (images && images.length > 0) {
+    const firstImg = images[0];
+    if (!content.includes('<img')) {
+      return `<img src="${firstImg}" alt="" style="max-width:100%;height:auto;border-radius:8px;margin-bottom:16px;" />\n${content}`;
+    }
+    return content;
+  }
+
+  const cover = CATEGORY_COVER[category];
+  if (cover && !content.includes('<img')) {
+    return `<img src="${cover}" alt="" style="max-width:100%;height:auto;border-radius:8px;margin-bottom:16px;" loading="lazy" />\n${content}`;
+  }
+  return content;
+}
+
 function buildArticle(raw, dateStr, index) {
-  const content = raw.rewrittenContent || raw.content || `<p>${raw.summary || ''}</p>`;
+  let content = raw.rewrittenContent || raw.content || `<p>${raw.summary || ''}</p>`;
+  content = injectCoverImage(content, raw.images, raw.category);
+
   const { wordCount, readTime } = calcReadTime(content);
 
   return {
@@ -152,8 +184,10 @@ function buildArticle(raw, dateStr, index) {
     readTime,
     source: raw.source || '',
     sourceUrl: raw.link || raw.sourceUrl || '',
-    coverImage: raw.coverImage || '',
-    isWechat: raw.isWechat || false
+    coverImage: (raw.images && raw.images[0]) || CATEGORY_COVER[raw.category] || '',
+    images: raw.images || [],
+    isWechat: raw.isWechat || false,
+    wasCompressed: raw.wasCompressed || false
   };
 }
 
@@ -274,7 +308,7 @@ async function main() {
     console.log(`\n[3/4] Rewriting ${toRewrite.length} articles with MIMO...`);
     let rewritten = [];
     try {
-      rewritten = await batchRewrite(toRewrite, REWRITE_SYSTEM_PROMPT, buildRewritePrompt);
+      rewritten = await batchRewrite(toRewrite, KEEP_VERBATIM_PROMPT, COMPRESS_PROMPT, buildKeepPrompt, buildCompressPrompt);
     } catch (err) {
       console.warn('AI rewrite failed, using originals:', err.message);
       rewritten = toRewrite;

@@ -18,8 +18,34 @@ const ArticleReader = (() => {
     document.getElementById('reader-source').textContent = article.source || '';
     document.getElementById('reader-wordcount').textContent = `${article.wordCount || 0}字`;
 
+    const trimLabel = document.getElementById('reader-trim-status');
+    if (trimLabel) {
+      if (article.wasCompressed) {
+        trimLabel.textContent = '已精简';
+        trimLabel.className = 'trim-badge compressed';
+        trimLabel.classList.remove('hidden');
+      } else {
+        trimLabel.textContent = '完整原文';
+        trimLabel.className = 'trim-badge full';
+        trimLabel.classList.remove('hidden');
+      }
+    }
+
     const body = document.getElementById('reader-body');
-    body.innerHTML = article.content || '';
+    let html = article.content || '';
+
+    html = html.replace(/<img([^>]*)>/gi, (match, attrs) => {
+      let srcMatch = attrs.match(/src=["']([^"']+)["']/i);
+      let src = srcMatch ? srcMatch[1] : '';
+      if (!src) return '';
+
+      let altMatch = attrs.match(/alt=["']([^"']*)["']/i);
+      let alt = altMatch ? altMatch[1] : '';
+
+      return `<figure class="article-figure"><img src="${_esc(src)}" alt="${_esc(alt)}" loading="lazy" onerror="this.parentElement.style.display='none'" /><figcaption>${_esc(alt)}</figcaption></figure>`;
+    });
+
+    body.innerHTML = html;
 
     const btn = document.getElementById('btn-mark-read');
     const isRead = Progress.getReadStatus(article.id);
@@ -92,6 +118,12 @@ const ArticleReader = (() => {
     const btn = document.getElementById('btn-mark-read');
     _updateMarkButton(btn, true);
     if (onReadCallback) onReadCallback(currentArticle.id, true);
+  }
+
+  function _esc(str) {
+    const el = document.createElement('span');
+    el.textContent = str || '';
+    return el.innerHTML;
   }
 
   return { show, hide, markCurrentRead };

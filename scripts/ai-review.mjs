@@ -15,7 +15,7 @@ async function callMIMO(messages, options = {}) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), options.timeout || 60000);
+      const timeout = setTimeout(() => controller.abort(), options.timeout || 90000);
 
       const response = await fetch(`${baseURL}/chat/completions`, {
         method: 'POST',
@@ -27,7 +27,7 @@ async function callMIMO(messages, options = {}) {
           model,
           messages,
           temperature: options.temperature ?? 0.7,
-          max_tokens: options.maxTokens || 2048
+          max_tokens: options.maxTokens || 4096
         }),
         signal: controller.signal
       });
@@ -58,6 +58,15 @@ async function callMIMO(messages, options = {}) {
   }
 
   throw lastError;
+}
+
+function getPlainTextLength(html) {
+  return (html || '').replace(/<[^>]*>/g, '').replace(/\s/g, '').length;
+}
+
+function shouldCompress(htmlContent) {
+  const charCount = getPlainTextLength(htmlContent);
+  return charCount > 5000;
 }
 
 async function filterArticles(items, systemPrompt, buildPrompt) {
@@ -107,30 +116,44 @@ function parseFilterResponse(text) {
   }
 }
 
-async function rewriteArticle(article, systemPrompt, buildPrompt) {
-  const userPrompt = buildPrompt(article);
+async function rewriteArticle(article, keepPrompt, compressPrompt, buildKeep, buildCompress) {
+  const rawContent = article.content || article.summary || '';
+  const needsCompress = shouldCompress(rawContent);
+  const charCount = getPlainTextLength(rawContent);
+
+  let systemPrompt, userPrompt;
+  if (needsCompress) {
+    systemPrompt = compressPrompt;
+    userPrompt = buildCompress(article);
+    console.log(`    [compress] "${article.title}" (${charCount} chars > 5000)`);
+  } else {
+    systemPrompt = keepPrompt;
+    userPrompt = buildKeep(article);
+    console.log(`    [keep] "${article.title}" (${charCount} chars <= 5000)`);
+  }
 
   try {
+    const maxTokens = needsCompress ? 8192 : 16384;
     const { content, usage } = await callMIMO([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt }
-    ], { temperature: 0.7, maxTokens: 2048 });
+    ], { temperature: 0.5, maxTokens });
 
-    return { content, usage };
+    return { content, usage, compressed: needsCompress };
   } catch (err) {
     console.warn(`Rewrite failed for "${article.title}":`, err.message);
     return null;
   }
 }
 
-async function batchRewrite(articles, systemPrompt, buildPrompt) {
+async function batchRewrite(articles, keepPrompt, compressPrompt, buildKeep, buildCompress) {
   const results = [];
-  const concurrency = 3;
+  const concurrency = 2;
 
   for (let i = 0; i < articles.length; i += concurrency) {
     const batch = articles.slice(i, i + concurrency);
     const promises = batch.map(article =>
-      rewriteArticle(article, systemPrompt, buildPrompt).then(result => ({
+      rewriteArticle(article, keepPrompt, compressPrompt, buildKeep, buildCompress).then(result => ({
         article,
         result
       }))
@@ -139,7 +162,13 @@ async function batchRewrite(articles, systemPrompt, buildPrompt) {
     const batchResults = await Promise.all(promises);
     batchResults.forEach(({ article, result }) => {
       if (result) {
-        results.push({ ...article, rewrittenContent: result.content });
+        results.push({
+          ...article,
+          rewrittenContent: result.content,
+          wasCompressed: result.compressed
+        });
+      } else {
+        results.push(article);
       }
     });
 
@@ -151,4 +180,4 @@ async function batchRewrite(articles, systemPrompt, buildPrompt) {
   return results;
 }
 
-export { callMIMO, filterArticles, rewriteArticle, batchRewrite };
+export { callMIMO, filterArticles, rewriteArticle, batchRewrite, getPlainTextLength };

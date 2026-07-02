@@ -445,6 +445,43 @@ main {
   color: var(--text-light);
 }
 
+.article-figure {
+  margin: 20px 0;
+  text-align: center;
+}
+
+.article-figure img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+}
+
+.article-figure figcaption {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin-top: 8px;
+  line-height: 1.4;
+}
+
+.trim-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+}
+
+.trim-badge.full {
+  background: #E8F5E9;
+  color: #2E7D32;
+}
+
+.trim-badge.compressed {
+  background: #FFF3E0;
+  color: #E65100;
+}
+
 .article-end-sentinel {
   height: 1px;
   width: 100%;

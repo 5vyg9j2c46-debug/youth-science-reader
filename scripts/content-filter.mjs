@@ -44,31 +44,58 @@ function parseFilterResponse(text) {
   }
 }
 
-const REWRITE_SYSTEM_PROMPT = `你是一位专业的青少年科普作家，专门为小升初学生（11-12岁）撰写通俗易懂的科普文章。
+const KEEP_VERBATIM_PROMPT = `你是一位专业的青少年科普编辑。你的任务是对文章做最小化编辑：
 
-## 创作规范
-1. 字数严格控制在300-600字之间
-2. 文风客观平实，侧重科学原理、地理常识
-3. 适配小升初理解能力，有轻思辨性
-4. 拒绝官话套话、空洞宏大评论、极端立场
-5. 语言生动但不低龄化，避免童话式表达
-6. 段落清晰，适合碎片时间阅读
+## 规则
+1. 完整保留全文所有文字内容，不删减任何段落
+2. 修正明显的错别字和语病
+3. 优化段落分段，使阅读更舒适
+4. 保留所有图片标记（如<img>标签），原样输出，不要删除任何图片
+5. 可适当添加<h2>、<h3>小标题帮助阅读，但不改变原文内容
 
 ## 输出要求
-只输出改写后的正文HTML内容。使用<p>标签包裹段落，可适当使用<h2>、<h3>、<blockquote>等语义化标签。
+输出编辑后的完整正文HTML。使用<p>标签包裹段落，可适当使用<h2>、<h3>、<blockquote>等语义化标签。
+所有<img>标签必须原样保留在输出中。
 不要输出标题、不要输出任何元信息，只输出正文。`;
 
-function buildRewritePrompt(article) {
-  return `请将以下新闻素材改写为适合小升初学生的科普短文：
+const COMPRESS_PROMPT = `你是一位专业的青少年科普作家。你的任务是将超长文章精简到5000字以内：
+
+## 规则
+1. 目标字数：5000字以内（约15分钟阅读量）
+2. 保留全部核心科普知识点、关键数据、实验案例
+3. 删除重复铺垫、冗余抒情、过渡废话
+4. 不丢失关键科学信息
+5. 保留所有图片标记（如<img>标签），原样输出，不要删除任何图片
+6. 文风客观平实，适配小升初理解能力
+
+## 输出要求
+输出精简后的正文HTML。使用<p>标签包裹段落，可适当使用<h2>、<h3>、<blockquote>等语义化标签。
+所有<img>标签必须原样保留在输出中。
+不要输出标题、不要输出任何元信息，只输出正文。`;
+
+function buildKeepPrompt(article) {
+  const bodyContent = article.content || article.summary || '';
+  return `请对以下文章做最小化编辑（完整保留全文，仅修正语病和优化分段）：
 
 标题：${article.title}
 原文内容：
-${article.summary || article.content || ''}
+${bodyContent}
 
-改写要求：
-- 300-600字
-- 客观平实，科普向
-- 适配11-12岁理解力
+注意：保留所有<img>标签，不要删除任何图片。只输出正文HTML。`;
+}
+
+function buildCompressPrompt(article) {
+  const bodyContent = article.content || article.summary || '';
+  return `请将以下超长文章精简到5000字以内：
+
+标题：${article.title}
+原文内容：
+${bodyContent}
+
+精简要求：
+- 5000字以内
+- 保留核心知识点、数据、案例
+- 保留所有<img>标签，不要删除任何图片
 - 只输出正文HTML`;
 }
 
@@ -76,6 +103,8 @@ export {
   FILTER_SYSTEM_PROMPT,
   buildFilterPrompt,
   parseFilterResponse,
-  REWRITE_SYSTEM_PROMPT,
-  buildRewritePrompt
+  KEEP_VERBATIM_PROMPT,
+  COMPRESS_PROMPT,
+  buildKeepPrompt,
+  buildCompressPrompt
 };

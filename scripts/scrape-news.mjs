@@ -110,6 +110,20 @@ const RSS_SOURCES = [
   }
 ];
 
+function extractImages(html) {
+  if (!html) return [];
+  const imgs = [];
+  const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+  let match;
+  while ((match = imgRegex.exec(html)) !== null) {
+    const src = match[1];
+    if (src && !src.includes('data:image') && !src.includes('icon') && !src.includes('logo') && !src.includes('avatar') && !src.includes('ad')) {
+      imgs.push(src);
+    }
+  }
+  return imgs;
+}
+
 async function fetchFromRSS(feedUrl) {
   try {
     const controller = new AbortController();
@@ -119,15 +133,31 @@ async function fetchFromRSS(feedUrl) {
     clearTimeout(timeout);
 
     const items = (feed.items || []).slice(0, 20).map(item => {
-      const desc = item.contentSnippet || item.content || item.description || item.summary || '';
-      const cleanDesc = desc.replace(/<[^>]*>/g, '').substring(0, 500);
+      const rawHtml = item['content:encoded'] || item.content || item.description || '';
+      const desc = item.contentSnippet || rawHtml.replace(/<[^>]*>/g, '');
+      const cleanDesc = desc.substring(0, 500);
+      const images = extractImages(rawHtml);
+
+      const mediaContent = item['media:content'];
+      const mediaThumb = item['media:thumbnail'];
+      const enclosure = item.enclosure;
+
+      if (mediaContent && mediaContent.$ && mediaContent.$.url) {
+        images.unshift(mediaContent.$.url);
+      } else if (mediaThumb && mediaThumb.$ && mediaThumb.$.url) {
+        images.unshift(mediaThumb.$.url);
+      } else if (enclosure && enclosure.url) {
+        images.unshift(enclosure.url);
+      }
 
       return {
         title: (item.title || '').trim(),
         summary: cleanDesc,
+        content: rawHtml,
         link: item.link || item.guid || '',
         source: feed.title || '',
-        pubDate: item.pubDate || item.isoDate || ''
+        pubDate: item.pubDate || item.isoDate || '',
+        images: [...new Set(images)].slice(0, 5)
       };
     }).filter(item => item.title.length > 0);
 
@@ -177,12 +207,19 @@ async function fetchFromHTML(htmlConfig) {
 
       seen.add(title);
       const fullLink = link.startsWith('http') ? link : new URL(link, htmlConfig.url).href;
+
+      const linkIdx = match.index;
+      const nearbyHtml = html.substring(Math.max(0, linkIdx - 500), Math.min(html.length, linkIdx + 1000));
+      const nearbyImages = extractImages(nearbyHtml);
+
       items.push({
         title,
         summary: '',
+        content: '',
         link: fullLink,
         source: htmlConfig.name,
-        pubDate: ''
+        pubDate: '',
+        images: nearbyImages.slice(0, 3)
       });
     }
 
