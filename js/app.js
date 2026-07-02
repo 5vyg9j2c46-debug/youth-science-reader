@@ -3,7 +3,7 @@ const App = (() => {
   let articles = [];
 
   const DEFAULT_REPO = '5vyg9j2c46-debug/youth-science-reader';
-  const DEFAULT_PAT = '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';
+  const DEFAULT_PAT = '';
 
   function init() {
     _ensureDefaults();
