@@ -1,0 +1,55 @@
+# 手动触发重新生成文稿
+# 支持 --extra 参数追加20篇
+
+name: manual-articles
+
+triggers:
+  - manual: {}
+
+env:
+  NODE_VERSION: "20"
+
+stages:
+  - name: regenerate
+    steps:
+      - name: checkout
+        uses: git-checkout@v1
+        with:
+          branch: master
+
+      - name: setup-node
+        uses: node-setup@v1
+        with:
+          version: "${{ NODE_VERSION }}"
+
+      - name: install-deps
+        run: |
+          npm install rss-parser cheerio
+
+      - name: generate-articles
+        run: |
+          EXTRA_FLAG=""
+          if [ "${EXTRA}" = "true" ]; then
+            EXTRA_FLAG="--extra"
+          fi
+          node scripts/generate-articles.mjs --source=manual ${EXTRA_FLAG} ${DATE_ARG}
+        env:
+          AI_API_KEY: "${{ AI_API_KEY }}"
+          AI_BASE_URL: "${{ AI_BASE_URL }}"
+          EXTRA: "${{ EXTRA }}"
+          DATE_ARG: "${{ DATE_ARG }}"
+
+      - name: commit-and-push
+        run: |
+          git config user.name "gitee-bot"
+          git config user.email "gitee-bot@gitee.com"
+          git add data/articles/
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "manual: articles $(date +%Y-%m-%d-%H%M)"
+          git push https://teenyteeny:${{ GITEE_TOKEN }}@gitee.com/teenyteeny/youth-reading.git HEAD:master
+
+    strategy:
+      retry: 1

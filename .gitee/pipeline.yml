@@ -1,0 +1,51 @@
+# Gitee Go 每日科普文摘生成流水线
+# 每日凌晨0点自动执行，也可手动触发
+
+name: daily-articles
+
+triggers:
+  - schedule:
+      cron: "0 0 * * *"
+  - manual: {}
+
+env:
+  NODE_VERSION: "20"
+
+stages:
+  - name: generate
+    steps:
+      - name: checkout
+        uses: git-checkout@v1
+        with:
+          branch: master
+
+      - name: setup-node
+        uses: node-setup@v1
+        with:
+          version: "${{ NODE_VERSION }}"
+
+      - name: install-deps
+        run: |
+          npm install rss-parser cheerio
+
+      - name: generate-articles
+        run: |
+          node scripts/generate-articles.mjs --source=auto
+        env:
+          AI_API_KEY: "${{ AI_API_KEY }}"
+          AI_BASE_URL: "${{ AI_BASE_URL }}"
+
+      - name: commit-and-push
+        run: |
+          git config user.name "gitee-bot"
+          git config user.email "gitee-bot@gitee.com"
+          git add data/articles/
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "auto: articles $(date +%Y-%m-%d)"
+          git push https://teenyteeny:${{ GITEE_TOKEN }}@gitee.com/teenyteeny/youth-reading.git HEAD:master
+
+    strategy:
+      retry: 1
