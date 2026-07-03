@@ -2,18 +2,23 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { scrapeAllNews } from './scrape-news.mjs';
-import { filterArticles, batchRewrite } from './ai-review.mjs';
+import { filterArticles, batchRewrite, batchGenerateQuiz } from './ai-review.mjs';
 import {
   FILTER_SYSTEM_PROMPT,
   buildFilterPrompt,
   KEEP_VERBATIM_PROMPT,
+  EXPAND_PROMPT,
   COMPRESS_PROMPT,
+  buildExpandPrompt,
   buildKeepPrompt,
-  buildCompressPrompt
+  buildCompressPrompt,
+  buildQuizPrompt,
+  parseQuizResponse
 } from './content-filter.mjs';
 import {
   CATEGORIES,
   getTargetCount,
+  getExtraCount,
   calcReadTime,
   generateId,
   todayStr,
@@ -96,6 +101,10 @@ function getGeneratedBy() {
   return process.env.GITHUB_EVENT_NAME === 'schedule' ? 'auto' : 'manual';
 }
 
+function isExtraMode() {
+  return process.argv.includes('--extra');
+}
+
 async function loadExistingArticles(dateStr) {
   const filePath = path.join(DATA_DIR, `${dateStr}.json`);
   try {
@@ -175,7 +184,7 @@ function buildArticle(raw, dateStr, index) {
 
   const { wordCount, readTime } = calcReadTime(content);
 
-  return {
+  const article = {
     id: generateId(dateStr, index),
     category: raw.category || '推荐阅读',
     title: raw.title || '无标题',
@@ -189,6 +198,12 @@ function buildArticle(raw, dateStr, index) {
     isWechat: raw.isWechat || false,
     wasCompressed: raw.wasCompressed || false
   };
+
+  if (raw.quiz && raw.quiz.single && raw.quiz.judge) {
+    article.quiz = raw.quiz;
+  }
+
+  return article;
 }
 
 function buildPresetArticle(preset, dateStr, index) {
@@ -212,16 +227,23 @@ async function main() {
   const dateStr = getDateArg();
   const generatedBy = getGeneratedBy();
   const isWeekend = isWeekendDate(dateStr);
-  const targetCount = getTargetCount(isWeekend);
+  const extraMode = isExtraMode();
+  const targetCount = extraMode ? getExtraCount() : getTargetCount(isWeekend);
 
-  console.log(`=== Generating articles for ${dateStr} ===`);
-  console.log(`Type: ${isWeekend ? 'Weekend' : 'Weekday'}, Target: ${targetCount} articles`);
+  console.log(`=== ${extraMode ? 'Extra' : 'Generating'} articles for ${dateStr} ===`);
+  console.log(`Target: ${targetCount} ${extraMode ? 'additional' : ''} articles`);
   console.log(`Trigger: ${generatedBy}`);
 
   const existing = await loadExistingArticles(dateStr);
-  const existingWechat = existing
-    ? existing.articles.filter(a => a.isWechat)
-    : [];
+  const existingArticles = existing ? existing.articles.filter(a => !a.isWechat) : [];
+  const existingWechat = existing ? existing.articles.filter(a => a.isWechat) : [];
+  const existingTitles = extraMode ? new Set(existingArticles.map(a => a.title)) : new Set();
+
+  if (extraMode) {
+    console.log(`Existing articles: ${existingArticles.length} (will deduplicate)`);
+  } else {
+    console.log(`Replacing all existing articles with fresh batch`);
+  }
 
   console.log('\n[1/4] Scraping news sources...');
   const newsByCategory = await scrapeAllNews();
@@ -273,7 +295,9 @@ async function main() {
 
     for (const cat of categories) {
       const candidates = filtered.filter(item =>
-        item.category === cat && !selected.find(s => s.title === item.title)
+        item.category === cat &&
+        !selected.find(s => s.title === item.title) &&
+        !existingTitles.has(item.title)
       );
       if (candidates.length > 0) {
         selected.push(candidates[0]);
@@ -282,7 +306,8 @@ async function main() {
 
     if (selected.length < targetCount) {
       const remaining = filtered.filter(item =>
-        !selected.find(s => s.title === item.title)
+        !selected.find(s => s.title === item.title) &&
+        !existingTitles.has(item.title)
       );
       selected.push(...remaining.slice(0, targetCount - selected.length));
     }
@@ -308,14 +333,28 @@ async function main() {
     console.log(`\n[3/4] Rewriting ${toRewrite.length} articles with MIMO...`);
     let rewritten = [];
     try {
-      rewritten = await batchRewrite(toRewrite, KEEP_VERBATIM_PROMPT, COMPRESS_PROMPT, buildKeepPrompt, buildCompressPrompt);
+      rewritten = await batchRewrite(toRewrite, KEEP_VERBATIM_PROMPT, COMPRESS_PROMPT, EXPAND_PROMPT, buildKeepPrompt, buildCompressPrompt, buildExpandPrompt);
     } catch (err) {
       console.warn('AI rewrite failed, using originals:', err.message);
       rewritten = toRewrite;
     }
     console.log(`Successfully rewritten: ${rewritten.length}`);
 
-    console.log('\n[4/4] Building final output...');
+    console.log('\n[4/5] Generating quiz from FINAL rewritten content...');
+    rewritten.forEach(a => {
+      if (a.rewrittenContent) {
+        a.content = a.rewrittenContent;
+      }
+    });
+    try {
+      await batchGenerateQuiz(rewritten, buildQuizPrompt, parseQuizResponse);
+      const quizCount = rewritten.filter(a => a.quiz).length;
+      console.log(`Quiz generated for ${quizCount}/${rewritten.length} articles`);
+    } catch (err) {
+      console.warn('Quiz generation failed (non-blocking):', err.message);
+    }
+
+    console.log('\n[5/5] Building final output...');
     rewritten.forEach((item) => {
       finalArticles.push(buildArticle(item, dateStr, finalArticles.length));
     });
@@ -333,22 +372,37 @@ async function main() {
   for (const cat of CATEGORIES) {
     categoryCounts[cat] = 0;
   }
-  finalArticles.forEach(a => {
-    categoryCounts[a.category] = (categoryCounts[a.category] || 0) + 1;
-  });
+
+  let mergedArticles;
+  if (extraMode) {
+    const newArticleIds = new Set(finalArticles.map(a => a.id));
+    mergedArticles = [
+      ...existingArticles,
+      ...finalArticles,
+      ...existingWechat
+    ];
+    mergedArticles.forEach(a => {
+      categoryCounts[a.category] = (categoryCounts[a.category] || 0) + 1;
+    });
+  } else {
+    mergedArticles = [...finalArticles, ...existingWechat];
+    finalArticles.forEach(a => {
+      categoryCounts[a.category] = (categoryCounts[a.category] || 0) + 1;
+    });
+  }
 
   const output = {
     date: dateStr,
     isWeekend,
     generatedAt: new Date().toISOString(),
     generatedBy,
-    articles: [...finalArticles, ...existingWechat],
-    totalArticles: finalArticles.length + existingWechat.length,
+    articles: mergedArticles,
+    totalArticles: mergedArticles.length,
     categories: categoryCounts
   };
 
   await saveArticles(dateStr, output);
-  console.log(`\n✓ Done! ${finalArticles.length} articles generated for ${dateStr}.`);
+  console.log(`\n✓ Done! ${mergedArticles.length} total articles for ${dateStr}.`);
   console.log(`  Category distribution:`);
   for (const [cat, count] of Object.entries(categoryCounts)) {
     if (count > 0) console.log(`    ${cat}: ${count}`);

@@ -31,6 +31,16 @@ const ArticleReader = (() => {
       }
     }
 
+    const sourceLink = document.getElementById('reader-source-link');
+    if (sourceLink) {
+      if (article.sourceUrl) {
+        sourceLink.href = article.sourceUrl;
+        sourceLink.classList.remove('hidden');
+      } else {
+        sourceLink.classList.add('hidden');
+      }
+    }
+
     const body = document.getElementById('reader-body');
     let html = article.content || '';
 
@@ -47,6 +57,8 @@ const ArticleReader = (() => {
 
     body.innerHTML = html;
 
+    _renderQuizEntry(article);
+
     const btn = document.getElementById('btn-mark-read');
     const isRead = Progress.getReadStatus(article.id);
     _updateMarkButton(btn, isRead);
@@ -55,8 +67,64 @@ const ArticleReader = (() => {
     _setupScrollDetection();
   }
 
+  function _renderQuizEntry(article) {
+    const entry = document.getElementById('quiz-entry');
+    if (!entry) return;
+
+    if (!Quiz.hasQuiz(article)) {
+      entry.classList.add('hidden');
+      return;
+    }
+
+    const quizResult = Quiz.getQuizResult(article.id);
+    if (quizResult) {
+      entry.innerHTML = `
+        <div class="quiz-entry-done">
+          <div class="quiz-entry-header">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>本篇测验已完成</span>
+          </div>
+          <p class="quiz-entry-score">得分：${quizResult.correct}/${quizResult.total}（${quizResult.percentage}%）</p>
+          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+            <button class="btn-secondary btn-quiz-retry" onclick="Quiz.start(window.__readerCurrentArticle, window.__onQuizComplete)">重新测验</button>
+            <button class="btn-back-home" onclick="ArticleReader.hide()">返回主页</button>
+          </div>
+        </div>
+      `;
+    } else {
+      entry.innerHTML = `
+        <div class="quiz-entry-start">
+          <div class="quiz-entry-divider">
+            <span>读后小测</span>
+          </div>
+          <p class="quiz-entry-desc">完成阅读后，试试你能答对几道题？</p>
+          <div class="quiz-entry-actions">
+            <button class="btn-primary btn-quiz-start" id="btn-start-quiz">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+              开始本篇知识点小测
+            </button>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('btn-start-quiz').addEventListener('click', () => {
+        window.__readerCurrentArticle = currentArticle;
+        window.__onQuizComplete = (id, correct, total) => {
+          _renderQuizEntry(currentArticle);
+          if (onReadCallback) onReadCallback(id, true);
+        };
+        Quiz.start(currentArticle, window.__onQuizComplete);
+      });
+    }
+
+    entry.classList.remove('hidden');
+  }
+
   function hide() {
     _teardownScrollDetection();
+    Quiz.close();
     document.getElementById('view-reader').classList.add('hidden');
     document.getElementById('view-home').classList.remove('hidden');
     document.getElementById('btn-back').classList.add('hidden');

@@ -43,10 +43,12 @@ const Progress = (() => {
   function setDailyStats(date, total, completed) {
     const data = _load();
     if (!data[STATS_KEY]) data[STATS_KEY] = {};
+    const GOAL = 10;
+    const effectivePct = completed >= GOAL ? 100 : (GOAL > 0 ? Math.round((completed / GOAL) * 100) : 0);
     data[STATS_KEY][date] = {
       totalArticles: total,
       completedCount: completed,
-      percentage: total > 0 ? Math.round((completed / total) * 100) : 0
+      percentage: effectivePct
     };
     _save(data);
   }

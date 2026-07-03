@@ -1,9 +1,9 @@
 import Parser from 'rss-parser';
 
 const parser = new Parser({
-  timeout: 15000,
+  timeout: 10000,
   headers: {
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
     'Accept': 'application/rss+xml, application/xml, text/xml, */*'
   },
   customFields: {
@@ -11,104 +11,31 @@ const parser = new Parser({
   }
 });
 
-const RSS_SOURCES = [
-  {
-    category: '航天深空·天文新知',
-    feeds: [
-      { name: '科学网-航天', url: 'https://news.sciencenet.cn/rss.aspx?tid=3' },
-      { name: '中科院之声', url: 'http://www.cas.cn/rss/rss.xml' }
-    ],
-    htmlFallbacks: [
-      { name: '科学网-航天', url: 'https://news.sciencenet.cn/news.aspx?type=3' }
-    ],
-    keywords: ['航天', '火箭', '卫星', '天文', '深空', '火星', '月球', '空间站', '宇宙', '望远镜', '探测', '星座', '银河', '太阳', '黑洞', '彗星', '小行星']
-  },
-  {
-    category: '考古文博·古文明发掘',
-    feeds: [
-      { name: '科学网-考古', url: 'https://news.sciencenet.cn/rss.aspx?tid=7' }
-    ],
-    htmlFallbacks: [
-      { name: '科学网-考古', url: 'https://news.sciencenet.cn/news.aspx?type=7' }
-    ],
-    keywords: ['考古', '文物', '古墓', '遗址', '博物馆', '发掘', '古文明', '青铜', '化石', '古城', '陵墓', '壁画', '陶器', '甲骨']
-  },
-  {
-    category: '大国工程·前沿科技突破',
-    feeds: [
-      { name: '科学网-信息技术', url: 'https://news.sciencenet.cn/rss.aspx?tid=1' },
-      { name: '36氪', url: 'https://36kr.com/feed' },
-      { name: 'IT之家', url: 'https://www.ithome.com/rss/' }
-    ],
-    htmlFallbacks: [
-      { name: '科学网-信息', url: 'https://news.sciencenet.cn/news.aspx?type=1' },
-      { name: 'IT之家', url: 'https://www.ithome.com/' }
-    ],
-    keywords: ['高铁', '大桥', '工程', '芯片', '量子', '人工智能', '机器人', '5G', '新能源', '核电', '超级计算机', '北斗', '电池', '光伏', '半导体', '算力', '大模型']
-  },
-  {
-    category: '地球自然·气象地质博物探索',
-    feeds: [
-      { name: '科学网-地球', url: 'https://news.sciencenet.cn/rss.aspx?tid=6' }
-    ],
-    htmlFallbacks: [
-      { name: '科学网-地球', url: 'https://news.sciencenet.cn/news.aspx?type=6' }
-    ],
-    keywords: ['气象', '地质', '地震', '火山', '台风', '气候', '冰川', '海洋', '矿石', '化石', '降雨', '寒潮', '暴雨', '雷电', '泥石流', '滑坡']
-  },
-  {
-    category: '生物世界·生命科学科普',
-    feeds: [
-      { name: '科学网-生命', url: 'https://news.sciencenet.cn/rss.aspx?tid=4' },
-      { name: '果壳网', url: 'https://www.guokr.com/rss/' }
-    ],
-    htmlFallbacks: [
-      { name: '科学网-生命', url: 'https://news.sciencenet.cn/news.aspx?type=4' },
-      { name: '果壳科学', url: 'https://www.guokr.com/scientific/' }
-    ],
-    keywords: ['生物', '动物', '植物', '基因', '细胞', '物种', '恐龙', '进化', '病毒', '细菌', '疫苗', '蛋白质', '神经', '免疫', '遗传', '生态']
-  },
-  {
-    category: '地理探索·环球人文地貌',
-    feeds: [
-      { name: '科学网-综合', url: 'https://news.sciencenet.cn/rss.aspx?tid=8' }
-    ],
-    htmlFallbacks: [
-      { name: '科学网-综合', url: 'https://news.sciencenet.cn/news.aspx?type=8' }
-    ],
-    keywords: ['地理', '地形', '河流', '山脉', '沙漠', '极地', '海洋', '湖泊', '峡谷', '高原', '盆地', '冰原', '热带雨林', '珊瑚礁']
-  },
-  {
-    category: '青少年健康医学科普',
-    feeds: [
-      { name: '科学网-医药', url: 'https://news.sciencenet.cn/rss.aspx?tid=5' }
-    ],
-    htmlFallbacks: [
-      { name: '科学网-医药', url: 'https://news.sciencenet.cn/news.aspx?type=5' }
-    ],
-    keywords: ['健康', '营养', '运动', '睡眠', '近视', '卫生', '疫苗', '防疫', '生长', '发育', '饮食', '锻炼', '心理', '护眼', '身高', '体重']
-  },
-  {
-    category: '生态环境·地球保护科考',
-    feeds: [
-      { name: '科学网-环境', url: 'https://news.sciencenet.cn/rss.aspx?tid=2' }
-    ],
-    htmlFallbacks: [
-      { name: '科学网-环境', url: 'https://news.sciencenet.cn/news.aspx?type=2' }
-    ],
-    keywords: ['环保', '生态', '碳中和', '新能源', '保护', '森林', '湿地', '濒危', '污染', '减排', '垃圾分类', '可持续', '绿色', '碳达峰']
-  },
-  {
-    category: '环球人文与跨国科考见闻',
-    feeds: [
-      { name: '科学网-综合', url: 'https://news.sciencenet.cn/rss.aspx?tid=8' }
-    ],
-    htmlFallbacks: [
-      { name: '爱范儿', url: 'https://www.ifanr.com/' }
-    ],
-    keywords: ['科考', '探险', '人文', '民俗', '文化', '世界遗产', '丝路', '极地', '南极', '北极', '深海', '登山', '考古', '文明']
-  }
+const FEEDS = [
+  { name: '人民网', url: 'http://www.people.com.cn/rss/politics.xml', priority: 1 },
+  { name: '中国日报', url: 'https://www.chinadaily.com.cn/rss/world_rss.xml', priority: 1 },
+  { name: '爱范儿', url: 'https://www.ifanr.com/feed', priority: 2 },
+  { name: '少数派', url: 'https://sspai.com/feed', priority: 2 },
+  { name: 'IT之家', url: 'https://www.ithome.com/rss/', priority: 3 },
+  { name: '36氪', url: 'https://36kr.com/feed', priority: 3 },
+  { name: 'Nature', url: 'https://www.nature.com/nature.rss', priority: 2 }
 ];
+
+const CATEGORY_KEYWORDS = {
+  '航天深空·天文新知': ['航天', '火箭', '卫星', '天文', '深空', '火星', '月球', '空间站', '宇宙', '望远镜', '探测', '太阳', '黑洞', 'NASA', 'SpaceX', '长征', '天问', '嫦娥', '北斗', '行星', '银河', '星座', '火箭发射', '太空'],
+  '考古文博·古文明发掘': ['考古', '文物', '古墓', '遗址', '博物馆', '发掘', '古文明', '青铜', '化石', '古城', '陵墓', '壁画', '三星堆', '敦煌', '兵马俑', '遗产', '古籍', '文物保护', '历史'],
+  '大国工程·前沿科技突破': ['芯片', '量子', '人工智能', '机器人', '5G', '6G', '新能源', '核电', '超级计算机', '电池', '光伏', '半导体', '大模型', 'AI', '自动驾驶', '无人机', '深海', '国产', '突破', '研发', '高铁', '大桥', '工程', '科技'],
+  '地球自然·气象地质博物探索': ['气象', '地质', '地震', '火山', '台风', '气候', '冰川', '海洋', '降雨', '寒潮', '暴雨', '天气', '自然', '极端天气', '海平面', '极地', '冻土', '矿石'],
+  '生物世界·生命科学科普': ['生物', '动物', '植物', '基因', '细胞', '物种', '恐龙', '进化', '病毒', '细菌', '疫苗', '蛋白质', '神经', '免疫', '遗传', '熊猫', 'DNA', '新物种', '濒危', '生态保护'],
+  '地理探索·环球人文地貌': ['地理', '地形', '河流', '山脉', '沙漠', '极地', '海洋', '湖泊', '峡谷', '高原', '盆地', '热带雨林', '珊瑚礁', '探险', '地貌', '世界遗产', '国家公园', '自然景观'],
+  '青少年健康医学科普': ['健康', '营养', '运动', '睡眠', '近视', '卫生', '疫苗', '青少年', '学生', '体质', '心理', '发育', '饮食', '锻炼', '护眼', '肥胖', '生长'],
+  '生态环境·地球保护科考': ['环保', '生态', '碳中和', '保护', '森林', '湿地', '濒危', '污染', '减排', '垃圾分类', '可持续', '绿色', '碳达峰', '太阳能', '风电', '清洁能源', '塑料', '水资源'],
+  '环球人文与跨国科考见闻': ['科考', '探险', '人文', '民俗', '文化', '世界遗产', '丝路', '极地', '南极', '北极', '深海', '登山', '国际', '全球', '跨国', '海外', '交流', '外国']
+};
+
+const BLACKLIST_KEYWORDS = ['融资', '投资', '股价', '上市', 'IPO', '估值', '基金', '炒股', '理财', '借贷', '金融', '期货', '牛市', '熊市', '涨停', '跌停', '分红', '减持', '增持', '营收', '财报', '净利润', '市值'];
+
+const feedCache = new Map();
 
 function extractImages(html) {
   if (!html) return [];
@@ -124,181 +51,91 @@ function extractImages(html) {
   return imgs;
 }
 
-async function fetchFromRSS(feedUrl) {
+function isBlacklisted(title, summary) {
+  const text = (title + ' ' + summary);
+  return BLACKLIST_KEYWORDS.some(kw => text.includes(kw));
+}
+
+async function fetchFeed(feedConfig) {
+  if (feedCache.has(feedConfig.url)) {
+    return feedCache.get(feedConfig.url);
+  }
+
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
-
-    const feed = await parser.parseURL(feedUrl);
-    clearTimeout(timeout);
-
-    const items = (feed.items || []).slice(0, 20).map(item => {
+    const feed = await parser.parseURL(feedConfig.url);
+    const items = (feed.items || []).slice(0, 60).map(item => {
       const rawHtml = item['content:encoded'] || item.content || item.description || '';
       const desc = item.contentSnippet || rawHtml.replace(/<[^>]*>/g, '');
-      const cleanDesc = desc.substring(0, 500);
       const images = extractImages(rawHtml);
-
-      const mediaContent = item['media:content'];
-      const mediaThumb = item['media:thumbnail'];
-      const enclosure = item.enclosure;
-
-      if (mediaContent && mediaContent.$ && mediaContent.$.url) {
-        images.unshift(mediaContent.$.url);
-      } else if (mediaThumb && mediaThumb.$ && mediaThumb.$.url) {
-        images.unshift(mediaThumb.$.url);
-      } else if (enclosure && enclosure.url) {
-        images.unshift(enclosure.url);
-      }
 
       return {
         title: (item.title || '').trim(),
-        summary: cleanDesc,
+        summary: desc.substring(0, 500),
         content: rawHtml,
         link: item.link || item.guid || '',
-        source: feed.title || '',
+        source: feedConfig.name,
         pubDate: item.pubDate || item.isoDate || '',
-        images: [...new Set(images)].slice(0, 5)
+        images: images.slice(0, 3),
+        priority: feedConfig.priority
       };
-    }).filter(item => item.title.length > 0);
+    }).filter(item => item.title.length > 4 && !isBlacklisted(item.title, item.summary));
 
+    feedCache.set(feedConfig.url, items);
+    console.log(`  [RSS] ${feedConfig.name}: ${items.length} items`);
     return items;
   } catch (err) {
-    console.warn(`    RSS failed (${feedUrl}): ${err.message}`);
+    console.warn(`  [RSS] ${feedConfig.name} failed: ${err.message}`);
+    feedCache.set(feedConfig.url, []);
     return [];
   }
 }
 
-async function fetchFromHTML(htmlConfig) {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
-
-    const resp = await fetch(htmlConfig.url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'zh-CN,zh;q=0.9'
-      },
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
-
-    if (!resp.ok) {
-      console.warn(`    HTML fetch failed (${htmlConfig.url}): HTTP ${resp.status}`);
-      return [];
-    }
-
-    const html = await resp.text();
-    const items = [];
-
-    const titleRegex = /<a[^>]*href=["']([^"']+)["'][^>]*>([^<]{8,80})<\/a>/gi;
-    let match;
-    const seen = new Set();
-
-    while ((match = titleRegex.exec(html)) !== null && items.length < 15) {
-      const title = match[2].trim();
-      const link = match[1];
-
-      if (title.length < 8 || title.length > 80) continue;
-      if (seen.has(title)) continue;
-      if (link.includes('javascript:') || link === '#' || link === '/') continue;
-      if (/^\d+$/.test(title)) continue;
-      if (title.includes('登录') || title.includes('注册') || title.includes('下载') || title.includes('首页')) continue;
-
-      seen.add(title);
-      const fullLink = link.startsWith('http') ? link : new URL(link, htmlConfig.url).href;
-
-      const linkIdx = match.index;
-      const nearbyHtml = html.substring(Math.max(0, linkIdx - 500), Math.min(html.length, linkIdx + 1000));
-      const nearbyImages = extractImages(nearbyHtml);
-
-      items.push({
-        title,
-        summary: '',
-        content: '',
-        link: fullLink,
-        source: htmlConfig.name,
-        pubDate: '',
-        images: nearbyImages.slice(0, 3)
-      });
-    }
-
-    return items;
-  } catch (err) {
-    console.warn(`    HTML crawl failed (${htmlConfig.url}): ${err.message}`);
-    return [];
-  }
-}
-
-function filterByKeywords(items, keywords) {
-  if (!keywords || keywords.length === 0) return items;
-  return items.filter(item => {
-    const text = (item.title + ' ' + item.summary).toLowerCase();
-    return keywords.some(kw => text.includes(kw.toLowerCase()));
-  });
-}
-
-async function scrapeCategory(categoryConfig) {
-  const { category, feeds, htmlFallbacks, keywords } = categoryConfig;
-  let allItems = [];
-
-  for (const feed of feeds) {
-    const items = await fetchFromRSS(feed.url);
-    if (items.length > 0) {
-      console.log(`    [RSS] ${feed.name}: ${items.length} items`);
-      allItems.push(...items);
-    }
-  }
-
-  if (allItems.length === 0 && htmlFallbacks && htmlFallbacks.length > 0) {
-    console.log(`    [HTML] RSS failed, trying HTML fallback...`);
-    for (const hf of htmlFallbacks) {
-      const items = await fetchFromHTML(hf);
-      if (items.length > 0) {
-        console.log(`    [HTML] ${hf.name}: ${items.length} items`);
-        allItems.push(...items);
-      }
-    }
-  }
-
-  allItems = allItems.map(item => ({ ...item, category }));
-
-  if (allItems.length > 0 && keywords && keywords.length > 0) {
-    const keywordFiltered = filterByKeywords(allItems, keywords);
-    if (keywordFiltered.length >= 2) {
-      allItems = keywordFiltered;
-    }
-  }
-
-  const seen = new Set();
-  allItems = allItems.filter(item => {
-    const key = item.title.substring(0, 15);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-
-  return allItems;
+function matchCategory(item, keywords) {
+  const text = (item.title + ' ' + item.summary).toLowerCase();
+  return keywords.some(kw => text.includes(kw.toLowerCase()));
 }
 
 async function scrapeAllNews() {
-  const results = {};
-  let totalFetched = 0;
+  console.log('Fetching all RSS feeds...');
+  const allFeedItems = [];
 
-  for (const catConfig of RSS_SOURCES) {
-    try {
-      const items = await scrapeCategory(catConfig);
-      results[catConfig.category] = items;
-      totalFetched += items.length;
-      console.log(`  [${catConfig.category}] => ${items.length} items`);
-    } catch (err) {
-      console.warn(`  [${catConfig.category}] scrape error: ${err.message}`);
-      results[catConfig.category] = [];
-    }
+  for (const feed of FEEDS) {
+    const items = await fetchFeed(feed);
+    allFeedItems.push(...items);
   }
 
-  console.log(`\n  Total fetched: ${totalFetched}`);
+  console.log(`Total raw items: ${allFeedItems.length}`);
+
+  const results = {};
+  const usedTitles = new Set();
+
+  for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    const matched = allFeedItems
+      .filter(item => matchCategory(item, keywords))
+      .filter(item => !usedTitles.has(item.title));
+
+    matched.sort((a, b) => (a.priority || 3) - (b.priority || 3));
+
+    const sourceCount = {};
+    const selected = [];
+    const MAX_PER_SOURCE = 4;
+
+    for (const item of matched) {
+      const count = sourceCount[item.source] || 0;
+      if (count >= MAX_PER_SOURCE) continue;
+      sourceCount[item.source] = count + 1;
+      selected.push({ ...item, category });
+      usedTitles.add(item.title);
+      if (selected.length >= 8) break;
+    }
+
+    results[category] = selected;
+    console.log(`  [${category}] => ${selected.length} items`);
+  }
+
+  const total = Object.values(results).reduce((s, arr) => s + arr.length, 0);
+  console.log(`Total distributed: ${total}`);
   return results;
 }
 
-export { scrapeAllNews, RSS_SOURCES };
+export { scrapeAllNews };

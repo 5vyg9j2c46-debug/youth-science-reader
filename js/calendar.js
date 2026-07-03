@@ -48,6 +48,7 @@ const Calendar = (() => {
     if (startWeekday === 0) startWeekday = 7;
 
     const stats = Progress.getMonthStats(currentYear, currentMonth);
+    const quizStats = _getMonthQuizStats(currentYear, currentMonth);
     const today = new Date();
     const todayStr = _fmtDate(today);
 
@@ -88,6 +89,15 @@ const Calendar = (() => {
         day.appendChild(pct);
       }
 
+      const quizDone = quizStats[dateStr] || 0;
+      if (quizDone > 0) {
+        const quizBadge = document.createElement('span');
+        quizBadge.className = 'cal-quiz-badge';
+        quizBadge.textContent = `⭐${quizDone}`;
+        quizBadge.title = `${quizDone}篇完成测验`;
+        day.appendChild(quizBadge);
+      }
+
       day.addEventListener('click', () => {
         if (typeof App !== 'undefined' && App.loadDate) {
           App.loadDate(dateStr);
@@ -96,6 +106,25 @@ const Calendar = (() => {
       });
 
       grid.appendChild(day);
+    }
+  }
+
+  function _getMonthQuizStats(year, month) {
+    try {
+      const data = JSON.parse(localStorage.getItem('youth_science_reader') || '{}');
+      const results = data.quizResults || {};
+      const prefix = `${year}-${String(month).padStart(2, '0')}`;
+      const stats = {};
+      for (const [articleId, result] of Object.entries(results)) {
+        const dateMatch = articleId.match(/^(\d{4}-\d{2}-\d{2})/);
+        if (dateMatch && dateMatch[1].startsWith(prefix)) {
+          const date = dateMatch[1];
+          stats[date] = (stats[date] || 0) + 1;
+        }
+      }
+      return stats;
+    } catch {
+      return {};
     }
   }
 

@@ -1,9 +1,12 @@
 const App = (() => {
   let currentDate = '';
   let articles = [];
+  let displayedCount = 0;
+  const PAGE_SIZE = 20;
 
-  const DEFAULT_REPO = '5vyg9j2c46-debug/youth-science-reader';
+  const DEFAULT_REPO = 'teenyteeny/youth-reading';
   const DEFAULT_PAT = '';
+  const DEFAULT_PLATFORM = 'gitee';
 
   function init() {
     _ensureDefaults();
@@ -17,11 +20,11 @@ const App = (() => {
   }
 
   function _ensureDefaults() {
+    if (!Progress.getSetting('platform')) {
+      Progress.setSetting('platform', DEFAULT_PLATFORM);
+    }
     if (!Progress.getSetting('repo')) {
       Progress.setSetting('repo', DEFAULT_REPO);
-    }
-    if (!Progress.getSetting('pat')) {
-      Progress.setSetting('pat', DEFAULT_PAT);
     }
   }
 
@@ -53,13 +56,16 @@ const App = (() => {
 
     document.getElementById('btn-settings').addEventListener('click', () => {
       document.getElementById('settings-modal').classList.remove('hidden');
+      document.getElementById('platform-select').value = Progress.getSetting('platform') || 'gitee';
       document.getElementById('pat-input').value = Progress.getSetting('pat');
       document.getElementById('repo-input').value = Progress.getSetting('repo');
     });
 
     document.getElementById('btn-settings-save').addEventListener('click', () => {
+      const platform = document.getElementById('platform-select').value;
       const pat = document.getElementById('pat-input').value.trim();
       const repo = document.getElementById('repo-input').value.trim();
+      if (platform) Progress.setSetting('platform', platform);
       if (pat) Progress.setSetting('pat', pat);
       if (repo) Progress.setSetting('repo', repo);
       document.getElementById('settings-modal').classList.add('hidden');
@@ -72,6 +78,8 @@ const App = (() => {
     document.querySelector('.modal-overlay').addEventListener('click', () => {
       document.getElementById('settings-modal').classList.add('hidden');
     });
+
+    document.getElementById('btn-load-more').addEventListener('click', handleLoadMore);
   }
 
   async function loadDate(dateStr) {
@@ -81,7 +89,6 @@ const App = (() => {
     const path = `data/articles/${dateStr}.json`;
     let data = null;
 
-    // Try local file first (works on GitHub Pages and local)
     try {
       const resp = await fetch(path);
       if (resp.ok) data = await resp.json();
@@ -89,7 +96,6 @@ const App = (() => {
       data = null;
     }
 
-    // Fallback: try GitHub raw (for private repos via API)
     if (!data && GitHubAPI.isConfigured()) {
       try {
         data = await GitHubAPI.getRawFile(path);
@@ -105,23 +111,85 @@ const App = (() => {
     }
 
     window.__currentArticles = articles;
+    displayedCount = 0;
+    _renderPage();
+  }
 
-    ArticleList.render(articles, handleArticleSelect);
+  function _renderPage() {
+    const pageArticles = articles.slice(0, displayedCount + PAGE_SIZE);
+    displayedCount = pageArticles.length;
+
+    ArticleList.render(pageArticles, handleArticleSelect);
 
     if (articles.length > 0) {
-      Progress.recalcDailyStats(dateStr, articles);
+      Progress.recalcDailyStats(currentDate, articles);
     } else {
-      Progress.setDailyStats(dateStr, 0, 0);
+      Progress.setDailyStats(currentDate, 0, 0);
     }
 
+    _updateLoadMoreButton();
     Calendar.refresh();
   }
 
-  async function _autoGenerate() {
-    if (!GitHubAPI.isConfigured()) return;
-    const btn = document.getElementById('btn-generate');
-    if (btn.disabled) return;
-    await handleGenerate();
+  function _updateLoadMoreButton() {
+    const btn = document.getElementById('btn-load-more');
+    const countInfo = document.getElementById('load-more-count');
+
+    btn.classList.remove('hidden');
+    countInfo.classList.remove('hidden');
+
+    const remaining = articles.length - displayedCount;
+    if (remaining > 0) {
+      countInfo.textContent = `已显示 ${displayedCount}/${articles.length} 篇，下方还有 ${remaining} 篇`;
+      btn.textContent = '展开更多文章';
+    } else {
+      countInfo.textContent = `全部 ${articles.length} 篇已显示`;
+      btn.textContent = '拉取更多文章';
+    }
+  }
+
+  async function handleLoadMore() {
+    const btn = document.getElementById('btn-load-more');
+    const remaining = articles.length - displayedCount;
+
+    if (remaining > 0) {
+      _renderPage();
+      return;
+    }
+
+    if (!GitHubAPI.isConfigured()) {
+      alert('请先在右下角设置中配置 GitHub Token 和仓库地址');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '正在拉取更多文章...';
+
+    try {
+      await GitHubAPI.triggerWorkflow('manual-generate.yml', {
+        date: currentDate,
+        extra: 'true'
+      });
+
+      const run = await GitHubAPI.getLatestRun('manual-generate.yml');
+      if (run) {
+        await GitHubAPI.pollRunStatus(run.id, (s) => {
+          if (s === 'in_progress') {
+            btn.textContent = 'AI正在生成更多文章...';
+          }
+        });
+      } else {
+        await new Promise(r => setTimeout(r, 25000));
+      }
+
+      await new Promise(r => setTimeout(r, 2000));
+      await loadDate(currentDate);
+    } catch (err) {
+      console.warn('Load more failed:', err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '拉取更多文章';
+    }
   }
 
   function handleArticleSelect(article) {
@@ -155,15 +223,18 @@ const App = (() => {
         date: currentDate
       });
 
-      _setProgress(10, '已触发，等待云端处理...', progressBar, progressPct, statusText);
+      _setProgress(10, '正在抓取科普资讯...', progressBar, progressPct, statusText);
 
       const run = await GitHubAPI.getLatestRun('manual-generate.yml');
       if (run) {
         let pct = 10;
+        const steps = ['正在抓取科普资讯...', 'AI审核筛选内容...', 'AI整理图文...', '生成配套习题...', '保存归档...'];
+        let stepIdx = 0;
         const completedRun = await GitHubAPI.pollRunStatus(run.id, (s, conclusion) => {
           if (s === 'in_progress') {
-            pct = Math.min(pct + 12, 85);
-            _setProgress(pct, 'AI正在生成文稿（约12-40秒）...', progressBar, progressPct, statusText);
+            pct = Math.min(pct + 10, 85);
+            stepIdx = Math.min(stepIdx + 1, steps.length - 1);
+            _setProgress(pct, steps[stepIdx], progressBar, progressPct, statusText);
           } else if (s === 'completed' && conclusion === 'failure') {
             _setProgress(0, '云端生成失败，请稍后重试', progressBar, progressPct, statusText);
           }

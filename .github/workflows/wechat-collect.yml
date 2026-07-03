@@ -24,6 +24,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -31,20 +32,21 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: |
-          npm init -y
-          npm install rss-parser cheerio
+        run: npm install rss-parser cheerio
 
       - name: Collect WeChat article
+        continue-on-error: true
         run: node scripts/collect-wechat.mjs --url="${{ inputs.url }}" ${{ inputs.date && format('--date={0}', inputs.date) || '' }}
         env:
-          MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}
-          MIMO_BASE_URL: ${{ secrets.MIMO_BASE_URL }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
 
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/articles/
-          git diff --staged --quiet || git commit -m "wechat: collect article $(date +%Y-%m-%d-%H%M%S)"
-          git push
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "wechat: article $(date +%Y-%m-%d-%H%M)"
+          git pull origin main --rebase --allow-unrelated-histories || true
+          git push origin main || git push origin main --force-with-lease

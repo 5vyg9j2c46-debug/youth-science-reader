@@ -7,6 +7,10 @@ on:
         description: 'Target date (YYYY-MM-DD), defaults to today'
         required: false
         default: ''
+      extra:
+        description: 'Set to true to append 20 more articles'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -14,13 +18,14 @@ permissions:
 jobs:
   regenerate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -28,21 +33,22 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: |
-          npm init -y
-          npm install rss-parser cheerio
+        run: npm install rss-parser cheerio
 
       - name: Generate articles
-        run: node scripts/generate-articles.mjs ${{ inputs.date && format('--date={0}', inputs.date) || '' }} --source=manual
+        continue-on-error: true
+        run: node scripts/generate-articles.mjs ${{ inputs.date && format('--date={0}', inputs.date) || '' }} --source=manual ${{ inputs.extra == 'true' && '--extra' || '' }}
         env:
-          MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}
-          MIMO_BASE_URL: ${{ secrets.MIMO_BASE_URL }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
 
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/articles/
-          git diff --staged --quiet || git commit -m "manual: regenerate articles $(date +%Y-%m-%d)"
-          git push
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "manual: articles $(date +%Y-%m-%d-%H%M)"
+          git pull origin main --rebase --allow-unrelated-histories || true
+          git push origin main || git push origin main --force-with-lease

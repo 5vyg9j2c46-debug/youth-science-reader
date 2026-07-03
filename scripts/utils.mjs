@@ -11,20 +11,18 @@ const CATEGORIES = [
 ];
 
 function getTargetCount(isWeekend) {
-  if (isWeekend) {
-    const min = 10, max = 20;
-    return min + Math.floor(Math.random() * (max - min + 1));
-  } else {
-    const min = 5, max = 10;
-    return min + Math.floor(Math.random() * (max - min + 1));
-  }
+  return 20;
+}
+
+function getExtraCount() {
+  return 20;
 }
 
 function calcReadTime(text) {
   const clean = text.replace(/<[^>]*>/g, '').replace(/\s/g, '');
   const wordCount = clean.length;
-  const rawMinutes = wordCount / 240;
-  const readTime = Math.max(3, Math.min(5, Math.ceil(rawMinutes)));
+  const rawMinutes = wordCount / 300;
+  const readTime = Math.max(3, Math.ceil(rawMinutes));
   return { wordCount, readTime };
 }
 
@@ -74,6 +72,7 @@ function sleep(ms) {
 export {
   CATEGORIES,
   getTargetCount,
+  getExtraCount,
   calcReadTime,
   generateId,
   todayStr,
