@@ -1,6 +1,6 @@
 {
   "envId": "youthread-d4gn9d9wr23b1a16a",
-  "functionRoot": "functions",
+  "functionRoot": ".",
   "functions": [
     {
       "name": "generate-articles",
@@ -8,8 +8,10 @@
       "runtime": "Nodejs18.15",
       "handler": "index.main",
       "installDependency": true,
+      "functionType": "HTTP",
+      "path": "/generate",
       "envVariables": {
-        "AI_API_KEY": "sk-86749520e7c44335a60ccd5bc0e739a8",
+        "AI_API_KEY": "sk-B7RdT263fDdbADatxMCgfyvlPb8ExPAURXpIEUTZ58H3N9jA",
         "AI_BASE_URL": "https://api.deepseek.com"
       }
     }

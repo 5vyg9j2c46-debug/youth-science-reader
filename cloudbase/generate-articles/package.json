@@ -1,0 +1,11 @@
+{
+  "name": "generate-articles",
+  "version": "1.0.0",
+  "description": "每日科普文摘自动生成云函数",
+  "main": "index.js",
+  "dependencies": {
+    "@cloudbase/node-sdk": "^2.6.0",
+    "rss-parser": "^3.13.0",
+    "cheerio": "^1.0.0"
+  }
+}
