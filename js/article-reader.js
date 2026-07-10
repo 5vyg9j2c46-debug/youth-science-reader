@@ -57,6 +57,12 @@ const ArticleReader = (() => {
 
     body.innerHTML = html;
 
+    // Add data-para-idx attributes to paragraphs for quiz jump-to-source
+    const paras = body.querySelectorAll('p');
+    paras.forEach((p, i) => {
+      p.dataset.paraIdx = i + 1;
+    });
+
     _renderQuizEntry(article);
 
     const btn = document.getElementById('btn-mark-read');
