@@ -2,14 +2,38 @@ const App = (() => {
   let currentDate = '';
   let articles = [];
   let displayedCount = 0;
+  let bgResult = null;
+  let bgLoading = false;
   const PAGE_SIZE = 20;
+  let cbApp = null;
 
   function init() {
+    _initCloudbase();
     currentDate = _getTodayStr();
     _updateDateDisplay();
     Calendar.init();
     _bindEvents();
     loadDate(currentDate);
+  }
+
+  function _initCloudbase() {
+    if (typeof cloudbase !== 'undefined') {
+      try {
+        cbApp = cloudbase.init({ env: 'youthread-d4gn9d9wr23b1a16a' });
+      } catch (e) {
+        console.warn('CloudBase init failed:', e.message);
+      }
+    }
+  }
+
+  async function _ensureAuth() {
+    if (!cbApp) return false;
+    try {
+      await cbApp.auth({ persistence: 'local' }).signInAnonymously();
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   function _bindEvents() {
@@ -31,11 +55,31 @@ const App = (() => {
     currentDate = dateStr;
     _updateDateDisplay();
     displayedCount = 0;
+    bgResult = null;
+    bgLoading = false;
 
     const cached = _getCached(dateStr);
     if (cached && cached.articles && cached.articles.length > 0) {
       articles = cached.articles;
       _renderPage();
+      return;
+    }
+
+    if (cbApp) {
+      try {
+        const authed = await _ensureAuth();
+        if (authed) {
+          const res = await cbApp.callFunction({ name: 'generate-articles', data: { date: dateStr } });
+          if (res.result && res.result.articles && res.result.articles.length > 0) {
+            articles = res.result.articles;
+            _saveCache(dateStr, res.result);
+            _renderPage();
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('CloudBase call failed:', e.message);
+      }
     }
 
     try {
@@ -51,9 +95,7 @@ const App = (() => {
       }
     } catch {}
 
-    if (!cached || !cached.articles || cached.articles.length === 0) {
-      _showEmpty();
-    }
+    if (!cached) _showEmpty();
   }
 
   function _showEmpty() {
@@ -66,7 +108,12 @@ const App = (() => {
     const page = articles.slice(0, displayedCount + PAGE_SIZE);
     displayedCount = page.length;
     ArticleList.render(page, handleArticleSelect);
-    Progress.recalcDailyStats(currentDate, articles);
+
+    if (articles.length > 0) {
+      Progress.recalcDailyStats(currentDate, articles);
+    } else {
+      Progress.setDailyStats(currentDate, 0, 0);
+    }
     _updateLoadMoreButton();
     Calendar.refresh();
   }
@@ -77,12 +124,22 @@ const App = (() => {
     btn.classList.remove('hidden');
     info.classList.remove('hidden');
     const remaining = articles.length - displayedCount;
-    if (remaining > 0) {
+    if (bgLoading) {
+      info.textContent = '后台加载中...';
+      btn.textContent = '后台加载中...';
+      btn.disabled = true;
+    } else if (bgResult && bgResult.length > 0) {
+      info.textContent = `已显示 ${displayedCount}/${articles.length + bgResult.length} 篇`;
+      btn.textContent = `展开下一批 (${bgResult.length} 篇)`;
+      btn.disabled = false;
+    } else if (remaining > 0) {
       info.textContent = `已显示 ${displayedCount}/${articles.length} 篇`;
       btn.textContent = '展开更多';
+      btn.disabled = false;
     } else {
       info.textContent = `共 ${articles.length} 篇`;
       btn.textContent = '拉取更多文章';
+      btn.disabled = false;
     }
   }
 
@@ -90,12 +147,22 @@ const App = (() => {
     const remaining = articles.length - displayedCount;
     if (remaining > 0) { _renderPage(); return; }
 
+    if (bgResult && bgResult.length > 0) {
+      const mainArea = document.getElementById('main-content');
+      window.scrollTo({ top: mainArea.scrollHeight, behavior: 'smooth' });
+      articles = [...articles, ...bgResult];
+      bgResult = null;
+      _saveCache(currentDate, { articles });
+      _renderPage();
+      return;
+    }
+
     const btn = document.getElementById('btn-load-more');
     btn.disabled = true;
     btn.textContent = '生成中...';
 
     try {
-      const result = await _callGenerate(currentDate, true, articles.map(a => a.title));
+      const result = await _callGenerate(currentDate, true, articles.map(a => a.title), true);
       if (result && result.articles && result.articles.length > 0) {
         const existing = new Set(articles.map(a => a.title));
         const newArts = result.articles.filter(a => !existing.has(a.title));
@@ -121,13 +188,12 @@ const App = (() => {
 
   const PROGRESS_STEPS = [
     { d: 2000, p: 8, t: '连接云端...' },
-    { d: 8000, p: 15, t: '抓取科普资讯...' },
-    { d: 20000, p: 30, t: 'RSS数据获取完成...' },
-    { d: 35000, p: 45, t: 'AI审核+改写中...' },
-    { d: 55000, p: 60, t: 'AI改写+出题中...' },
-    { d: 80000, p: 75, t: '批量生成进行中...' },
-    { d: 110000, p: 85, t: '即将完成...' },
-    { d: 140000, p: 92, t: '保存中...' },
+    { d: 8000, p: 20, t: '抓取科普资讯...' },
+    { d: 20000, p: 35, t: 'RSS数据获取...' },
+    { d: 35000, p: 50, t: 'AI改写文章中...' },
+    { d: 55000, p: 70, t: '生成配套习题...' },
+    { d: 75000, p: 85, t: '即将完成...' },
+    { d: 95000, p: 95, t: '最后处理...' },
   ];
 
   function _showProgress() { document.getElementById('generate-progress').classList.remove('hidden'); }
@@ -142,7 +208,7 @@ const App = (() => {
     const timers = PROGRESS_STEPS.map(s => setTimeout(() => _setProgress(s.p, s.t), s.d));
 
     try {
-      const result = await _callGenerate(currentDate, false, []);
+      const result = await _callGenerate(currentDate, false, [], true);
       timers.forEach(t => clearTimeout(t));
       if (result && result.articles && result.articles.length > 0) {
         articles = result.articles;
@@ -151,6 +217,7 @@ const App = (() => {
         _renderPage();
         _setProgress(100, `${articles.length} 篇已就绪!`);
         _hideProgress();
+        setTimeout(() => _startBackgroundFetch(), 1000);
       } else {
         _setProgress(0, '生成失败，请重试');
       }
@@ -162,18 +229,46 @@ const App = (() => {
     }
   }
 
-  async function _callGenerate(dateStr, extra, excludeTitles) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 300000);
-    const resp = await fetch(PlatformAPI.getFnUrl(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date: dateStr, extra: !!extra, excludeTitles: excludeTitles || [], quick: true }),
-      signal: controller.signal
-    });
-    clearTimeout(timer);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    return resp.json();
+  async function _startBackgroundFetch() {
+    if (bgLoading) return;
+    bgLoading = true;
+    _updateLoadMoreButton();
+
+    try {
+      const result = await _callGenerate(currentDate, true, articles.map(a => a.title), true);
+      if (result && result.articles && result.articles.length > 0) {
+        const existing = new Set(articles.map(a => a.title));
+        bgResult = result.articles.filter(a => !existing.has(a.title));
+        console.log(`Background fetch: ${bgResult.length} new articles`);
+      } else {
+        bgResult = null;
+      }
+    } catch (e) {
+      console.warn('Background fetch failed:', e);
+      bgResult = null;
+    } finally {
+      bgLoading = false;
+      _updateLoadMoreButton();
+    }
+  }
+
+  async function _callGenerate(dateStr, extra, excludeTitles, quick) {
+    if (cbApp) {
+      try {
+        const authed = await _ensureAuth();
+        if (authed) {
+          const res = await cbApp.callFunction({
+            name: 'generate-articles',
+            data: { date: dateStr, extra: !!extra, excludeTitles: excludeTitles || [], quick: !!quick }
+          });
+          if (res.result) return res.result;
+        }
+      } catch (e) {
+        console.warn('CloudBase call failed:', e.message);
+      }
+    }
+
+    throw new Error('CloudBase not configured');
   }
 
   function handleArticleSelect(article) {
