@@ -71,17 +71,6 @@
         </div>
       </div>
 
-      <div class="wechat-section">
-        <div class="wechat-input-group">
-          <input type="text" id="wechat-url-input" placeholder="粘贴微信文章「浏览器打开链接」收录优质好文" />
-          <button id="btn-wechat-collect" class="btn-secondary">收录</button>
-        </div>
-        <div id="wechat-status" class="wechat-status hidden">
-          <div class="spinner small"></div>
-          <span id="wechat-status-text">收录中...</span>
-        </div>
-      </div>
-
       <div class="date-navigator">
         <button id="btn-prev-day" class="btn-icon" aria-label="前一天">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -177,47 +166,12 @@
     </section>
   </main>
 
-  <div id="settings-modal" class="modal hidden">
-    <div class="modal-overlay"></div>
-    <div class="modal-content">
-      <h2>设置</h2>
-      <div class="setting-item">
-        <label for="platform-select">托管平台</label>
-        <select id="platform-select" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.875rem;font-family:var(--font);background:var(--bg);color:var(--text);outline:none;">
-          <option value="gitee">Gitee（国内推荐）</option>
-          <option value="github">GitHub</option>
-        </select>
-      </div>
-      <div class="setting-item">
-        <label for="pat-input">访问令牌 (Token)</label>
-        <input type="password" id="pat-input" placeholder="粘贴你的Token" />
-        <p class="setting-hint">用于触发云端文章生成，仅保存在本地浏览器</p>
-      </div>
-      <div class="setting-item">
-        <label for="repo-input">仓库地址</label>
-        <input type="text" id="repo-input" placeholder="username/repo-name" />
-      </div>
-      <div class="modal-actions">
-        <button id="btn-settings-save" class="btn-primary">保存</button>
-        <button id="btn-settings-cancel" class="btn-secondary">取消</button>
-      </div>
-    </div>
-  </div>
-
-  <button id="btn-settings" class="btn-settings-float" aria-label="设置">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <circle cx="12" cy="12" r="3"/>
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-    </svg>
-  </button>
-
   <script src="js/progress.js"></script>
   <script src="js/github-api.js"></script>
   <script src="js/calendar.js"></script>
   <script src="js/article-list.js"></script>
   <script src="js/quiz.js"></script>
   <script src="js/article-reader.js"></script>
-  <script src="js/wechat-collect.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
