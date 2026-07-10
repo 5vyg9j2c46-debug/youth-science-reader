@@ -93,14 +93,17 @@ const Quiz = (() => {
   function _bindSingleEvents(q, idx) {
     document.querySelectorAll(`.quiz-option-btn[data-idx="${idx}"]`).forEach(btn => {
       btn.addEventListener('click', () => {
-        const selected = btn.dataset.option;
-        const isCorrect = selected === q.correctOption;
-        _showFeedback(isCorrect, q.correctOption, q.sourceParagraph, q.sourceText);
+        const selected = (btn.dataset.option || '').trim();
+        const correct = (q.correctOption || '').trim();
+        const isCorrect = selected === correct;
+        const paraNum = parseInt(q.sourceParagraph, 10);
+        const sourceText = q.sourceText || '';
+        _showFeedback(isCorrect, q.correctOption || '', paraNum, sourceText);
 
         document.querySelectorAll(`.quiz-option-btn[data-idx="${idx}"]`).forEach(b => {
           b.disabled = true;
-          if (b.dataset.option === q.correctOption) b.classList.add('correct');
-          if (b.dataset.option === selected && !isCorrect) b.classList.add('wrong');
+          if ((b.dataset.option || '').trim() === correct) b.classList.add('correct');
+          if ((b.dataset.option || '').trim() === selected && !isCorrect) b.classList.add('wrong');
         });
 
         results.push({ type: 'single', correct: isCorrect, question: q.question, answer: q.correctOption, userAnswer: selected });
@@ -114,7 +117,9 @@ const Quiz = (() => {
         const selected = btn.dataset.answer === 'true';
         const isCorrect = selected === q.correctAnswer;
         const correctText = q.correctAnswer ? '正确 (√)' : '错误 (×)';
-        _showFeedback(isCorrect, correctText, q.sourceParagraph, q.sourceText);
+        const paraNum = parseInt(q.sourceParagraph, 10);
+        const sourceText = q.sourceText || '';
+        _showFeedback(isCorrect, correctText, paraNum, sourceText);
 
         document.querySelectorAll(`.quiz-judge-btn[data-idx="${idx}"]`).forEach(b => {
           b.disabled = true;
@@ -232,12 +237,32 @@ const Quiz = (() => {
     const body = document.getElementById('reader-body');
     if (!body) return;
 
-    const paragraphs = body.querySelectorAll('p');
-    const targetIdx = paragraphNum - 1;
-    if (paragraphs[targetIdx]) {
-      paragraphs[targetIdx].scrollIntoView({ behavior: 'smooth', block: 'center' });
-      paragraphs[targetIdx].style.background = '#FFF9C4';
-      setTimeout(() => { paragraphs[targetIdx].style.background = ''; }, 3000);
+    const paraNum = parseInt(paragraphNum, 10);
+    if (isNaN(paraNum) || paraNum < 1) {
+      // Fallback: scroll to top of article
+      body.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+
+    const paragraphs = body.querySelectorAll('p[data-para-idx]');
+    let target = null;
+    for (const p of paragraphs) {
+      if (parseInt(p.dataset.paraIdx, 10) === paraNum) {
+        target = p;
+        break;
+      }
+    }
+
+    // Fallback if data-para-idx not found: use nth <p> tag
+    if (!target) {
+      const allP = body.querySelectorAll('p');
+      target = allP[paraNum - 1];
+    }
+
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      target.style.background = '#FFF9C4';
+      setTimeout(() => { target.style.background = ''; }, 3000);
     }
   }
 
